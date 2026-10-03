@@ -29,10 +29,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view dev \
-            || gh release create dev \
+          gh release delete dev --yes --cleanup-tag || true
+          gh release view dev-build \
+            || gh release create dev-build \
                  --prerelease \
-                 --title "dev" \
+                 --title "dev-build" \
                  --notes "Build de prueba instalable desde la rama dev."
-          gh release edit dev --notes "Commit ${GITHUB_SHA}. Fase inicial: APK sin firma de release ni Discord."
-          gh release upload dev build/app/outputs/flutter-apk/app-release.apk --clobber
+          gh release edit dev-build --notes "Commit ${GITHUB_SHA}. Fase inicial: APK sin firma de release ni Discord."
+          gh release upload dev-build build/app/outputs/flutter-apk/app-release.apk --clobber
