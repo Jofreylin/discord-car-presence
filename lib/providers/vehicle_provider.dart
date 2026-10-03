@@ -4,7 +4,14 @@ import '../models/connection_type.dart';
 import '../models/vehicle_state.dart';
 
 class VehicleProvider extends ChangeNotifier {
-  VehicleProvider({DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
+  VehicleProvider({
+    DateTime Function()? clock,
+    bool autoDetectAndroid = true,
+    bool autoDetectCarPlay = true,
+  }) : _clock = clock ?? DateTime.now {
+    _autoDetectAndroid = autoDetectAndroid;
+    _autoDetectCarPlay = autoDetectCarPlay;
+  }
 
   final DateTime Function() _clock;
 
@@ -21,6 +28,10 @@ class VehicleProvider extends ChangeNotifier {
   );
 
   VehicleState get state => _state;
+
+  bool get autoDetectAndroid => _autoDetectAndroid;
+
+  bool get autoDetectCarPlay => _autoDetectCarPlay;
 
   void setManualLatched(bool value) {
     _manualLatched = value;
