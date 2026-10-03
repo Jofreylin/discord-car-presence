@@ -1,0 +1,38 @@
+name: dev-build
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --release
+      - name: Publish dev release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view dev \
+            || gh release create dev \
+                 --prerelease \
+                 --title "dev" \
+                 --notes "Build de prueba instalable desde la rama dev."
+          gh release edit dev --notes "Commit ${GITHUB_SHA}. Fase inicial: APK sin firma de release ni Discord."
+          gh release upload dev build/app/outputs/flutter-apk/app-release.apk --clobber
