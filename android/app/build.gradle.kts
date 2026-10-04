@@ -14,9 +14,33 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    buildFeatures {
+        prefab = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
+    packaging {
+        jniLibs {
+            excludes += setOf("**/*krisp*")
+        }
+        resources {
+            excludes += setOf("**/*krisp*", "**/*.kef", "**/*.kw")
+        }
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.byjofrey.car_presence"
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++20"
+            }
+        }
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -46,4 +70,14 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.browser:browser:1.8.0")
+    val sdkAar = rootDir.resolve(
+        "../third_party/discord-social-sdk/lib/release/discord_partner_sdk.aar",
+    )
+    if (sdkAar.isFile) {
+        implementation(files(sdkAar))
+    }
 }

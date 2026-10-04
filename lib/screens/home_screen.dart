@@ -5,12 +5,18 @@ import 'package:provider/provider.dart';
 
 import '../models/connection_type.dart';
 import '../providers/vehicle_provider.dart';
+import '../services/discord_service.dart';
 import '../services/settings_service.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.settings});
+  const HomeScreen({
+    super.key,
+    required this.settings,
+    required this.discord,
+  });
 
   final SettingsService settings;
+  final DiscordService discord;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +33,7 @@ class HomeScreen extends StatelessWidget {
               if (!state.carMode) ...[
                 const _OffHeader(),
                 const SizedBox(height: 32),
-                const _DiscordSection(),
+                _DiscordSection(discord: discord),
                 const SizedBox(height: 32),
                 const Text('Estado del vehículo'),
                 const SizedBox(height: 8),
@@ -37,7 +43,7 @@ class HomeScreen extends StatelessWidget {
               ] else ...[
                 _ActiveSession(connectionType: state.connectionType),
                 const SizedBox(height: 32),
-                const _DiscordSection(),
+                _DiscordSection(discord: discord),
               ],
               const SizedBox(height: 32),
               Text('Detección automática'),
@@ -94,19 +100,44 @@ class _OffHeader extends StatelessWidget {
 }
 
 class _DiscordSection extends StatelessWidget {
-  const _DiscordSection();
+  const _DiscordSection({required this.discord});
+
+  final DiscordService discord;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('Discord'),
-        const SizedBox(height: 8),
-        const Text('Cuenta sin conectar'),
-        const SizedBox(height: 12),
-        OutlinedButton(onPressed: () {}, child: const Text('Conectar Discord')),
-      ],
+    return ListenableBuilder(
+      listenable: discord,
+      builder: (context, _) {
+        final name = discord.displayName;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Discord'),
+            const SizedBox(height: 8),
+            if (name == null) ...[
+              const Text('Cuenta sin conectar'),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: () {
+                  unawaited(discord.connect());
+                },
+                child: const Text('Conectar Discord'),
+              ),
+            ] else ...[
+              Text(name),
+              const SizedBox(height: 8),
+              const Text('Cuenta conectada'),
+              TextButton(
+                onPressed: () {
+                  unawaited(discord.disconnect());
+                },
+                child: const Text('Cerrar sesión'),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:car_presence/main.dart';
 import 'package:car_presence/providers/vehicle_provider.dart';
+import 'package:car_presence/services/discord_service.dart';
 import 'package:car_presence/services/settings_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,12 +12,17 @@ void main() {
   Future<void> pumpHome(
     WidgetTester tester,
     VehicleProvider provider,
-    SettingsService settings,
-  ) async {
+    SettingsService settings, {
+    DiscordService? discord,
+  }) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
         create: (_) => provider,
-        child: CarPresenceApp(settings: settings),
+        child: CarPresenceApp(
+          settings: settings,
+          discord: discord ??
+              DiscordService(settings: settings, applicationId: '1'),
+        ),
       ),
     );
   }
