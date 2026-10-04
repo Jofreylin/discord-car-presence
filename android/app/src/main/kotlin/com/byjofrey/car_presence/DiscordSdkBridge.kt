@@ -1,5 +1,6 @@
 package com.byjofrey.car_presence
 
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import com.discord.socialsdk.DiscordSocialSdkInit
@@ -20,6 +21,7 @@ class DiscordSdkBridge(
         }
     }
     private var connectResult: MethodChannel.Result? = null
+    private var presenceResult: MethodChannel.Result? = null
 
     fun start() {
         DiscordSocialSdkInit.setEngineActivity(activity)
@@ -43,7 +45,25 @@ class DiscordSdkBridge(
                 }
                 "getCurrentUser" -> result.success(nativeCurrentUser())
                 "getStatus" -> result.success(nativeStatus())
-                "updatePresence", "clearPresence" -> result.notImplemented()
+                "updatePresence" -> {
+                    if (nativeStatus() != "ready") {
+                        result.error("not_ready", "Discord SDK is not Ready", null)
+                    } else {
+                        presenceResult = result
+                        nativeUpdatePresence(
+                            call.argument<String>("details") ?: "",
+                            call.argument<String>("state") ?: "",
+                        )
+                    }
+                }
+                "clearPresence" -> {
+                    if (nativeStatus() != "ready") {
+                        result.error("not_ready", "Discord SDK is not Ready", null)
+                    } else {
+                        nativeClearPresence()
+                        result.success(null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -58,6 +78,7 @@ class DiscordSdkBridge(
     }
 
     fun onConnectResult(accessToken: String?, refreshToken: String?, error: String?) {
+        bringActivityToFront()
         val pending = connectResult ?: return
         connectResult = null
         if (error != null) {
@@ -84,6 +105,23 @@ class DiscordSdkBridge(
 
     fun onClearTokens() {
         channel.invokeMethod("clearStoredTokens", null)
+    }
+
+    fun onPresenceResult(error: String?) {
+        val pending = presenceResult ?: return
+        presenceResult = null
+        if (error.isNullOrEmpty()) {
+            pending.success(null)
+            return
+        }
+        pending.error("discord", error, null)
+    }
+
+    private fun bringActivityToFront() {
+        val intent = Intent(activity, activity.javaClass).apply {
+            addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        activity.startActivity(intent)
     }
 
     private fun requestStoredTokens() {
@@ -121,4 +159,8 @@ class DiscordSdkBridge(
     private external fun nativeStatus(): String
 
     private external fun nativeCurrentUser(): Map<String, String>?
+
+    private external fun nativeUpdatePresence(details: String, state: String)
+
+    private external fun nativeClearPresence()
 }

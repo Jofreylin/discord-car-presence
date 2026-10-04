@@ -25,6 +25,7 @@ Future<void> main() async {
       create: (_) => VehicleProvider(
         autoDetectAndroid: autoDetectAndroid,
         autoDetectCarPlay: autoDetectCarPlay,
+        discord: discord,
       ),
       child: CarPresenceApp(settings: settings, discord: discord),
     ),

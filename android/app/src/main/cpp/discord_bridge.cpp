@@ -17,6 +17,7 @@ jmethodID g_on_status = nullptr;
 jmethodID g_on_connect_result = nullptr;
 jmethodID g_on_replace_tokens = nullptr;
 jmethodID g_on_clear_tokens = nullptr;
+jmethodID g_on_presence_result = nullptr;
 
 std::shared_ptr<discordpp::Client> g_client;
 uint64_t g_application_id = 0;
@@ -25,6 +26,7 @@ std::string g_refresh;
 bool g_connect_pending = false;
 bool g_restoring = false;
 bool g_refresh_tried = false;
+bool g_authorize_after_disconnect = false;
 
 JNIEnv* env_for_callback() {
   JNIEnv* env = nullptr;
@@ -76,6 +78,18 @@ void emit_replace_tokens(const std::string& access, const std::string& refresh) 
   env->CallVoidMethod(g_bridge, g_on_replace_tokens, access_value, refresh_value);
   env->DeleteLocalRef(access_value);
   env->DeleteLocalRef(refresh_value);
+}
+
+void emit_presence_result(const std::string& error) {
+  JNIEnv* env = env_for_callback();
+  if (env == nullptr || g_bridge == nullptr || g_on_presence_result == nullptr) {
+    return;
+  }
+  jstring value = error.empty() ? nullptr : env->NewStringUTF(error.c_str());
+  env->CallVoidMethod(g_bridge, g_on_presence_result, value);
+  if (value != nullptr) {
+    env->DeleteLocalRef(value);
+  }
 }
 
 void emit_clear_tokens() {
@@ -168,6 +182,8 @@ void connect_with_token(const std::string& access) {
     });
 }
 
+void begin_authorize();
+
 void ensure_client() {
   if (g_client != nullptr) {
     return;
@@ -207,8 +223,29 @@ void ensure_client() {
         refresh_or_clear();
         return;
       }
+      if (g_authorize_after_disconnect && status == discordpp::Client::Status::Disconnected) {
+        g_authorize_after_disconnect = false;
+        begin_authorize();
+        return;
+      }
       emit_status(status_name(status, error));
     });
+}
+
+void prepare_authorize() {
+  if (g_client == nullptr) {
+    return;
+  }
+  const auto status = g_client->GetStatus();
+  if (status == discordpp::Client::Status::Disconnected) {
+    g_authorize_after_disconnect = false;
+    begin_authorize();
+    return;
+  }
+  g_authorize_after_disconnect = true;
+  if (status != discordpp::Client::Status::Disconnecting) {
+    g_client->Disconnect();
+  }
 }
 
 void begin_authorize() {
@@ -275,6 +312,7 @@ Java_com_byjofrey_car_1presence_DiscordSdkBridge_nativeInit(JNIEnv* env, jobject
     "onReplaceTokens",
     "(Ljava/lang/String;Ljava/lang/String;)V");
   g_on_clear_tokens = env->GetMethodID(cls, "onClearTokens", "()V");
+  g_on_presence_result = env->GetMethodID(cls, "onPresenceResult", "(Ljava/lang/String;)V");
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -343,7 +381,7 @@ Java_com_byjofrey_car_1presence_DiscordSdkBridge_nativeConnect(JNIEnv* env, jobj
   }
   g_connect_pending = true;
   g_refresh_tried = false;
-  begin_authorize();
+  prepare_authorize();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -354,8 +392,16 @@ Java_com_byjofrey_car_1presence_DiscordSdkBridge_nativeDisconnect(JNIEnv*, jobje
   g_refresh.clear();
   g_connect_pending = false;
   g_restoring = false;
-  if (g_client != nullptr && !token.empty() && application_id != 0) {
-    g_client->RevokeToken(application_id, token, [](discordpp::ClientResult) {});
+  g_authorize_after_disconnect = false;
+  if (g_client != nullptr) {
+    if (!token.empty() && application_id != 0) {
+      g_client->RevokeToken(application_id, token, [](discordpp::ClientResult) {});
+    }
+    const auto status = g_client->GetStatus();
+    if (status != discordpp::Client::Status::Disconnected &&
+        status != discordpp::Client::Status::Disconnecting) {
+      g_client->Disconnect();
+    }
   }
   emit_status("disconnected");
 }
@@ -396,4 +442,42 @@ Java_com_byjofrey_car_1presence_DiscordSdkBridge_nativeCurrentUser(JNIEnv* env, 
   put_string("username", user->Username());
   put_string("displayName", user->DisplayName());
   return map;
+}
+
+std::string jstring_to_std(JNIEnv* env, jstring value) {
+  if (value == nullptr) {
+    return "";
+  }
+  const char* raw = env->GetStringUTFChars(value, nullptr);
+  std::string text = raw == nullptr ? "" : raw;
+  if (raw != nullptr) {
+    env->ReleaseStringUTFChars(value, raw);
+  }
+  return text;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_byjofrey_car_1presence_DiscordSdkBridge_nativeUpdatePresence(
+  JNIEnv* env,
+  jobject,
+  jstring details,
+  jstring state) {
+  if (g_client == nullptr || g_client->GetStatus() != discordpp::Client::Status::Ready) {
+    emit_presence_result("not ready");
+    return;
+  }
+  discordpp::Activity activity{};
+  activity.SetType(discordpp::ActivityTypes::Playing);
+  activity.SetDetails(jstring_to_std(env, details));
+  activity.SetState(jstring_to_std(env, state));
+  g_client->UpdateRichPresence(activity, [](discordpp::ClientResult result) {
+    emit_presence_result(result.Successful() ? "" : "update presence failed");
+  });
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_byjofrey_car_1presence_DiscordSdkBridge_nativeClearPresence(JNIEnv*, jobject) {
+  if (g_client != nullptr && g_client->GetStatus() == discordpp::Client::Status::Ready) {
+    g_client->ClearRichPresence();
+  }
 }

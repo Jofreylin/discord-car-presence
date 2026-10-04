@@ -26,9 +26,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Same empty affinity as MainActivity, so the OAuth redirect
+             brings this task forward instead of leaving the user in Discord. -->
         <activity
             android:name="com.discord.socialsdk.AuthenticationActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>

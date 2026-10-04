@@ -9,11 +9,7 @@ import '../services/discord_service.dart';
 import '../services/settings_service.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({
-    super.key,
-    required this.settings,
-    required this.discord,
-  });
+  const HomeScreen({super.key, required this.settings, required this.discord});
 
   final SettingsService settings;
   final DiscordService discord;
@@ -33,7 +29,7 @@ class HomeScreen extends StatelessWidget {
               if (!state.carMode) ...[
                 const _OffHeader(),
                 const SizedBox(height: 32),
-                _DiscordSection(discord: discord),
+                _DiscordSection(discord: discord, carMode: state.carMode),
                 const SizedBox(height: 32),
                 const Text('Estado del vehículo'),
                 const SizedBox(height: 8),
@@ -43,7 +39,7 @@ class HomeScreen extends StatelessWidget {
               ] else ...[
                 _ActiveSession(connectionType: state.connectionType),
                 const SizedBox(height: 32),
-                _DiscordSection(discord: discord),
+                _DiscordSection(discord: discord, carMode: state.carMode),
               ],
               const SizedBox(height: 32),
               Text('Detección automática'),
@@ -100,9 +96,10 @@ class _OffHeader extends StatelessWidget {
 }
 
 class _DiscordSection extends StatelessWidget {
-  const _DiscordSection({required this.discord});
+  const _DiscordSection({required this.discord, required this.carMode});
 
   final DiscordService discord;
+  final bool carMode;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +131,10 @@ class _DiscordSection extends StatelessWidget {
                 },
                 child: const Text('Cerrar sesión'),
               ),
+            ],
+            if (carMode && discord.status != 'ready') ...[
+              const SizedBox(height: 12),
+              const Text('La presencia se publicará al conectar'),
             ],
           ],
         );

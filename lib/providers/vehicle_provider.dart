@@ -1,19 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/connection_type.dart';
 import '../models/vehicle_state.dart';
+import '../services/discord_service.dart';
 
 class VehicleProvider extends ChangeNotifier {
   VehicleProvider({
     DateTime Function()? clock,
     bool autoDetectAndroid = true,
     bool autoDetectCarPlay = true,
+    DiscordService? discord,
   }) : _clock = clock ?? DateTime.now {
     _autoDetectAndroid = autoDetectAndroid;
     _autoDetectCarPlay = autoDetectCarPlay;
+    _discord = discord;
   }
 
   final DateTime Function() _clock;
+  DiscordService? _discord;
 
   bool _manualLatched = false;
   bool _androidAutoConnected = false;
@@ -89,5 +95,11 @@ class VehicleProvider extends ChangeNotifier {
       connectedSince: connectedSince,
     );
     notifyListeners();
+    final discord = _discord;
+    if (discord != null) {
+      unawaited(
+        discord.applyDesired(presenceDetails(_state), presenceState(_state)),
+      );
+    }
   }
 }
